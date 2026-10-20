@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import mqtt from 'mqtt';
 import { startDevice } from './device';
 
+async function run() {
 const url = process.env.MQTT_URL ?? 'ws://localhost:8080/mqtt';
 const prefix = 'fiap/teste/cp3-' + Date.now().toString(36);
 const device = startDevice(url, prefix);
@@ -49,3 +50,6 @@ try {
 } catch (error) {
   console.error(error); process.exitCode = 1;
 } finally { cleanup(); }
+
+}
+void run().catch(error => { console.error(error); process.exitCode = 1; });

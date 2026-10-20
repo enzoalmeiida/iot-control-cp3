@@ -25,7 +25,7 @@ try {
   await page.waitForFunction(() => {
     const t = document.querySelector('[data-testid="temperature-value"]');
     const h = document.querySelector('[data-testid="humidity-value"]');
-    return t?.textContent !== '—' && h?.textContent !== '—';
+    return t && h && t.textContent !== '—' && h.textContent !== '—';
   });
   await page.getByRole('button', { name: 'Ligar', exact: true }).click();
   await page.getByText('Ligada', { exact: true }).waitFor();
