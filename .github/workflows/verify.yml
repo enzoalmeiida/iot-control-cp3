@@ -1,0 +1,73 @@
+name: Verificar aplicativo e gerar prints
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/screenshots/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cp3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: '1'
+      EXPO_NO_TELEMETRY: '1'
+      MQTT_URL: ws://localhost:8080/mqtt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependências
+        run: npm install
+      - name: Conferir tipos
+        run: npm run typecheck
+      - name: Testar validações e histórico
+        run: npm test
+      - name: Iniciar broker WebSocket local
+        run: |
+          npm run broker > /tmp/broker.log 2>&1 &
+          node -e "const net=require('net'); let n=0; const poll=()=>{const s=net.connect(8080,'127.0.0.1',()=>{s.end();process.exit(0)});s.on('error',()=>{if(++n>30)process.exit(1);setTimeout(poll,1000)})};poll()"
+      - name: Testar ciclo MQTT com simulador
+        run: npm run test:mqtt
+      - name: Exportar aplicativo Web
+        run: npx expo export --platform web
+      - name: Iniciar simulador e servidor Web
+        run: |
+          npm run simulator > /tmp/simulator.log 2>&1 &
+          npx --yes serve dist -l 8082 > /tmp/web.log 2>&1 &
+          node -e "const net=require('net'); let n=0; const poll=()=>{const s=net.connect(8082,'127.0.0.1',()=>{s.end();process.exit(0)});s.on('error',()=>{if(++n>60)process.exit(1);setTimeout(poll,1000)})};poll()"
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Testar interface e capturar prints reais
+        run: npm run screenshots
+      - name: Anexar prints à execução
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prints-iot-control
+          path: docs/screenshots/*.png
+          if-no-files-found: ignore
+      - name: Salvar prints e lockfile no repositório
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots/*.png package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "docs: adicionar prints reais e versões resolvidas [skip ci]"
+            git push
+          fi
+      - name: Mostrar logs de diagnóstico
+        if: failure()
+        run: |
+          cat /tmp/broker.log /tmp/simulator.log /tmp/web.log 2>/dev/null || true

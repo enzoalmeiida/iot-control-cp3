@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "IoT Control",
+    "slug": "iot-control-cp3",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "br.com.fiap.iotcontrolcp3"
+    },
+    "web": {
+      "bundler": "metro",
+      "name": "IoT Control"
+    }
+  }
+}

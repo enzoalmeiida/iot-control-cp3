@@ -1,0 +1,41 @@
+{
+  "name": "iot-control-cp3",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "simulator": "tsx scripts/simulator.ts",
+    "test:mqtt": "tsx scripts/smoke.ts",
+    "screenshots": "node scripts/screenshots.mjs",
+    "broker": "node scripts/broker.mjs"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~54.0.0",
+    "expo-status-bar": "~3.0.8",
+    "mqtt": "^5.10.4",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-web": "^0.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2",
+    "tsx": "^4.20.5",
+    "playwright": "^1.55.0",
+    "aedes": "^0.51.3",
+    "ws": "^8.18.3"
+  },
+  "engines": {
+    "node": ">=20.19.4"
+  }
+}
