@@ -23,7 +23,7 @@ test('descarta dados malformados, tipos incorretos, tópicos estranhos e valores
 test('URL exige WebSocket e recusa credenciais e portas TCP usuais', () => {
   assert.equal(validateBrokerUrl(' wss://test.mosquitto.org:8081/mqtt '), 'wss://test.mosquitto.org:8081/mqtt');
   for (const input of ['mqtt://localhost:1883', 'ws://localhost:1883', 'wss://localhost:8883', 'abc', 'wss://user:pass@host/mqtt', 'wss://host/mqtt?token=secreto']) {
-    assert.throws(() => validateBrokerUrl(input), undefined, input);
+    assert.throws(() => validateBrokerUrl(input), Error, input);
   }
 });
 test('histórico mantém exatamente as dez mais recentes e não altera o array anterior', () => {
