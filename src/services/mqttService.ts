@@ -1,101 +1,129 @@
-import mqtt from 'mqtt/dist/mqtt.esm';
-import type { MqttClient } from 'mqtt';
 import { SUBSCRIPTIONS, TOPICS } from '../config';
 import type { ConnectionState, LampState } from '../types/mqtt';
 import { validateBrokerUrl } from '../utils/protocol';
 
-interface Callbacks {
-  onStatus: (status: ConnectionState, detail?: string) => void;
-  onMessage: (topic: string, payload: string) => void;
+export interface TransportHandlers {
+  connect: () => void;
+  message: (topic: string, payload: string, retained: boolean) => void;
+  close: () => void;
+  reconnect: () => void;
+  error: (error: Error) => void;
+}
+export interface MqttTransport {
+  readonly connected: boolean;
+  subscribe: (topics: string[], done: (error?: Error) => void) => void;
+  publish: (topic: string, payload: string, done: (error?: Error) => void) => void;
+  dispose: () => void;
+}
+export type TransportFactory = (url: string, handlers: TransportHandlers) => MqttTransport;
+export interface MqttCallbacks {
+  onStatus: (status: ConnectionState, detail?: string, retrying?: boolean) => void;
+  onMessage: (topic: string, payload: string, retained: boolean) => void;
+  onReconnect?: () => void;
 }
 export class MqttService {
-  private client: MqttClient | null = null;
+  private transport: MqttTransport | null = null;
   private generation = 0;
   private ready = false;
-  constructor(private callbacks: Callbacks) {}
+  private subscriptionTimer: ReturnType<typeof setTimeout> | null = null;
+  private sends = new Set<(error?: Error) => void>();
+  constructor(private callbacks: MqttCallbacks, private factory: TransportFactory) {}
 
+  get connected(): boolean { return this.ready && !!this.transport?.connected; }
+  private clearSubscriptionTimer() {
+    if (this.subscriptionTimer) clearTimeout(this.subscriptionTimer);
+    this.subscriptionTimer = null;
+  }
+  private rejectSends(message: string) {
+    for (const finish of [...this.sends]) finish(new Error(message));
+  }
   connect(input: string): void {
     const url = validateBrokerUrl(input);
     this.disconnect(false);
     const generation = ++this.generation;
     const current = () => generation === this.generation;
+    let lastError = '';
     this.callbacks.onStatus('conectando');
     try {
-      const client = mqtt.connect(url, {
-        clientId: 'app-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9),
-        protocolVersion: 4,
-        clean: true,
-        reconnectPeriod: 3000,
-        connectTimeout: 10000,
-        keepalive: 30,
-        resubscribe: false,
-        queueQoSZero: false,
-        timerVariant: 'native',
-      });
-      this.client = client;
-      client.on('connect', () => {
-        if (!current()) return;
-        this.ready = false;
-        client.subscribe(SUBSCRIPTIONS, { qos: 1 }, (error, grants) => {
+      this.transport = this.factory(url, {
+        connect: () => {
           if (!current()) return;
-          if (error || !grants || grants.some(grant => grant.qos === 128)) {
-            this.callbacks.onStatus('erro', 'Não foi possível assinar os tópicos. Toque em Reconectar.');
-            return;
-          }
-          this.ready = true;
-          this.callbacks.onStatus('conectado');
-        });
-      });
-      client.on('message', (topic, payload) => {
-        if (current()) this.callbacks.onMessage(topic, payload.toString());
-      });
-      client.on('reconnect', () => {
-        if (!current()) return;
-        this.ready = false;
-        this.callbacks.onStatus('conectando', 'Tentando reconectar ao broker…');
-      });
-      client.on('close', () => {
-        if (!current()) return;
-        this.ready = false;
-        this.callbacks.onStatus('desconectado', 'Conexão interrompida. Uma nova tentativa ocorrerá automaticamente.');
-      });
-      client.on('error', (error: Error) => {
-        if (!current()) return;
-        this.ready = false;
-        this.callbacks.onStatus('erro', 'Falha MQTT: ' + error.message);
+          lastError = '';
+          this.ready = false;
+          this.clearSubscriptionTimer();
+          const failSubscription = (message: string) => {
+            if (!current()) return;
+            this.disconnect(false);
+            this.callbacks.onStatus('erro', message + ' Toque em Reconectar.');
+          };
+          this.subscriptionTimer = setTimeout(() => failSubscription('O broker não confirmou a inscrição nos tópicos.'), 6000);
+          this.transport?.subscribe(SUBSCRIPTIONS, error => {
+            if (!current()) return;
+            this.clearSubscriptionTimer();
+            if (error) { failSubscription(error.message); return; }
+            this.ready = true;
+            this.callbacks.onStatus('conectado');
+          });
+        },
+        message: (topic, payload, retained) => {
+          if (current()) this.callbacks.onMessage(topic, payload, retained);
+        },
+        reconnect: () => {
+          if (!current()) return;
+          this.ready = false;
+          this.clearSubscriptionTimer();
+          lastError = '';
+          this.callbacks.onReconnect?.();
+          this.callbacks.onStatus('conectando', 'Reconectando ao ambiente…', true);
+        },
+        close: () => {
+          if (!current()) return;
+          this.ready = false;
+          this.clearSubscriptionTimer();
+          this.rejectSends('A conexão foi interrompida antes de concluir o envio.');
+          this.callbacks.onStatus(lastError ? 'erro' : 'desconectado',
+            lastError || 'Conexão interrompida. Tentaremos novamente em 3 segundos.', true);
+        },
+        error: error => {
+          if (!current()) return;
+          this.ready = false;
+          lastError = 'Não foi possível comunicar com o broker. ' + error.message;
+          this.callbacks.onStatus('erro', lastError, true);
+        },
       });
     } catch (error) {
-      if (current()) this.callbacks.onStatus('erro', error instanceof Error ? error.message : 'Falha de conexão.');
+      if (current()) {
+        this.disconnect(false);
+        this.callbacks.onStatus('erro', error instanceof Error ? error.message : 'Falha de conexão.');
+      }
     }
   }
-
   publishLamp(action: LampState): Promise<void> {
-    const client = this.client;
-    if (!client?.connected || !this.ready) {
-      return Promise.reject(new Error('Conecte ao broker antes de enviar comandos.'));
-    }
+    const transport = this.transport;
+    if (!transport?.connected || !this.ready) return Promise.reject(new Error('Conecte ao broker antes de enviar comandos.'));
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Tempo esgotado ao enviar o comando.')), 4000);
-      // QoS 0 com fila desativada evita guardar comandos para uma reconexão futura.
-      client.publish(TOPICS.command, JSON.stringify({ action }), { qos: 0, retain: false }, error => {
+      let finished = false;
+      const finish = (error?: Error) => {
+        if (finished) return;
+        finished = true;
         clearTimeout(timer);
+        this.sends.delete(finish);
         if (error) reject(error); else resolve();
-      });
+      };
+      const timer = setTimeout(() => finish(new Error('Tempo esgotado ao enviar o comando.')), 4000);
+      this.sends.add(finish);
+      try { transport.publish(TOPICS.command, JSON.stringify({ action }), finish); }
+      catch (error) { finish(error instanceof Error ? error : new Error('Falha no envio.')); }
     });
   }
-
   disconnect(notify = true): void {
     ++this.generation;
     this.ready = false;
-    const client = this.client;
-    this.client = null;
-    if (client) {
-      if (client.connected) client.unsubscribe(SUBSCRIPTIONS);
-      client.end(true);
-      client.removeAllListeners();
-      // Uma falha tardia do socket encerrado não deve propagar para a interface.
-      client.on('error', () => undefined);
-    }
+    this.clearSubscriptionTimer();
+    this.rejectSends('Envio cancelado porque a conexão foi encerrada.');
+    const transport = this.transport;
+    this.transport = null;
+    transport?.dispose();
     if (notify) this.callbacks.onStatus('desconectado');
   }
 }

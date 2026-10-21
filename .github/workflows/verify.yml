@@ -31,7 +31,7 @@ jobs:
         run: npm install
       - name: Conferir tipos
         run: npm run typecheck
-      - name: Testar validações e histórico
+      - name: Testar protocolo, transporte e estado da sessão
         run: npm test
       - name: Iniciar broker WebSocket local
         run: |
@@ -41,9 +41,8 @@ jobs:
         run: npm run test:mqtt
       - name: Exportar aplicativo Android, iOS e Web
         run: npx expo export --platform all
-      - name: Iniciar simulador e servidor Web
+      - name: Iniciar servidor Web
         run: |
-          npm run simulator > /tmp/simulator.log 2>&1 &
           npx --yes serve dist -l 8082 > /tmp/web.log 2>&1 &
           node -e "const net=require('net'); let n=0; const poll=()=>{const s=net.connect(8082,'127.0.0.1',()=>{s.end();process.exit(0)});s.on('error',()=>{if(++n>60)process.exit(1);setTimeout(poll,1000)})};poll()"
       - name: Instalar Chromium

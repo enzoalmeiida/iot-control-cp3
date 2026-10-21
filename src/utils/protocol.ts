@@ -2,7 +2,9 @@ import { TOPICS } from '../config';
 import type { MessageEntry, Telemetry } from '../types/mqtt';
 
 export function validateBrokerUrl(input: string): string {
-  const url = new URL(input.trim());
+  let url: URL;
+  try { url = new URL(input.trim()); }
+  catch { throw new Error('Informe uma URL completa, como wss://test.mosquitto.org:8081/mqtt.'); }
   if (!['ws:', 'wss:'].includes(url.protocol) || !url.hostname) {
     throw new Error('Use uma URL WebSocket: ws:// ou wss://.');
   }
