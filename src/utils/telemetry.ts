@@ -6,7 +6,7 @@ export function appendSample(samples: Reading<number>[], sample: Reading<number>
   return [...samples, sample].slice(-SAMPLE_LIMIT);
 }
 export function isFresh(reading: Reading<unknown> | null, now: number): boolean {
-  return reading !== null && now - reading.updatedAt <= STALE_AFTER_MS;
+  return reading !== null && !reading.retained && now - reading.updatedAt <= STALE_AFTER_MS;
 }
 export function summarize(samples: Reading<number>[]) {
   if (!samples.length) return null;

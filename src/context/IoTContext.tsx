@@ -118,15 +118,15 @@ export function IoTProvider({ children }: PropsWithChildren) {
         const updatedAt = Date.now();
         setLastMessageAt(updatedAt);
         if (parsed.kind === 'temperature') {
-          const reading = { value: parsed.value, updatedAt };
+          const reading = { value: parsed.value, updatedAt, retained };
           setTemperature(reading); setTemperatureSamples(previous => appendSample(previous, reading));
         }
         if (parsed.kind === 'humidity') {
-          const reading = { value: parsed.value, updatedAt };
+          const reading = { value: parsed.value, updatedAt, retained };
           setHumidity(reading); setHumiditySamples(previous => appendSample(previous, reading));
         }
         if (parsed.kind === 'lamp') {
-          setLamp({ value: parsed.value, updatedAt });
+          setLamp({ value: parsed.value, updatedAt, retained });
           if (!retained && pendingRef.current?.action === parsed.value) {
             clearPending(); notify('Estado da lâmpada confirmado pelo dispositivo.', 'success');
           }

@@ -19,6 +19,7 @@ test('frescor do dispositivo expira mesmo que o broker continue conectado', () =
   assert.equal(isFresh(reading, 11000), true);
   assert.equal(isFresh(reading, 11001), false);
   assert.equal(isFresh(null, 11000), false);
+  assert.equal(isFresh({ ...reading, retained: true }, 1001), false);
   assert.equal(ageLabel(undefined, 1000), 'Sem leituras');
   assert.equal(ageLabel(1000, 1500), 'Agora');
   assert.equal(ageLabel(1000, 6000), 'Há 5 s');

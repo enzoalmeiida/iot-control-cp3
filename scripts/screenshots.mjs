@@ -132,7 +132,15 @@ try {
   await page.getByTestId('screen-scroll').evaluate(element => element.scrollTo(0, 0));
   await page.screenshot({ path: output + '/dashboard-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 320, height: 900 });
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= 320), true, 'Layout não pode vazar horizontalmente em 320 px.');
+  try {
+    await page.waitForFunction(() => document.documentElement.scrollWidth <= window.innerWidth, null, { timeout: 5000 });
+  } catch {
+    const overflow = await page.evaluate(() => [...document.querySelectorAll('*')].map(element => ({
+      tag: element.tagName, text: element.textContent?.slice(0, 70),
+      left: element.getBoundingClientRect().left, right: element.getBoundingClientRect().right,
+    })).filter(item => item.right > window.innerWidth + 1).slice(-15));
+    throw new Error('Layout excede 320 px: ' + JSON.stringify(overflow));
+  }
   await tab('Configurações');
   await page.getByRole('button', { name: 'Desconectar', exact: true }).click();
   await page.getByTestId('connection-status').getByText('Desconectado', { exact: true }).waitFor();
