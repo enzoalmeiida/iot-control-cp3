@@ -27,8 +27,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
       - name: Instalar dependências
-        run: npm install
+        run: npm ci
       - name: Conferir tipos
         run: npm run typecheck
       - name: Testar protocolo, transporte e estado da sessão

@@ -49,7 +49,7 @@ async function capture(name, height = 1380) {
   await dismiss();
   await page.setViewportSize({ width: 390, height });
   await page.getByTestId('screen-scroll').evaluate(element => element.scrollTo(0, 0));
-  await page.screenshot({ path: output + '/' + name + '.png', fullPage: true });
+  await page.screenshot({ path: output + '/' + name + '.png', fullPage: true, animations: 'disabled' });
 }
 async function publish(topic, payload) {
   await new Promise((resolve, reject) => client.publish(prefix + topic, payload, { retain: false }, error => error ? reject(error) : resolve()));
@@ -127,10 +127,11 @@ try {
   await page.getByRole('button', { name: 'Consultar tópicos MQTT', exact: true }).click();
   await page.getByTestId('topic-reference').waitFor();
   await tab('Dashboard');
+  await page.getByText(/Aguardando mais leituras/).first().waitFor({ state: 'hidden' });
   await capture('dashboard-light');
   await page.setViewportSize({ width: 1440, height: 1060 });
   await page.getByTestId('screen-scroll').evaluate(element => element.scrollTo(0, 0));
-  await page.screenshot({ path: output + '/dashboard-desktop.png', fullPage: true });
+  await page.screenshot({ path: output + '/dashboard-desktop.png', fullPage: true, animations: 'disabled' });
   await page.setViewportSize({ width: 320, height: 900 });
   try {
     await page.waitForFunction(() => document.documentElement.scrollWidth <= window.innerWidth, null, { timeout: 5000 });

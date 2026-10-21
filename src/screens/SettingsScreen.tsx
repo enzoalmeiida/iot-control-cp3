@@ -34,7 +34,7 @@ export function SettingsScreen() {
         style={[styles.input, { color: palette.text, backgroundColor: palette.background, borderColor: touched && validation ? palette.danger : palette.border }]} />
       {touched && validation !== '' ? <Text testID="broker-validation" style={{ color: palette.danger, fontSize: 12, lineHeight: 18 }}>{validation}</Text> : <Text style={{ color: palette.muted, fontSize: 11, lineHeight: 17 }}>Use ws:// ou wss:// com a porta WebSocket. O endereço é salvo somente neste dispositivo.</Text>}
       <View style={ui.row}>
-        <View style={ui.grow}><Button title="Salvar endereço" icon="check" secondary disabled={saving} onPress={() => void save(false)} /></View>
+        <View style={ui.grow}><Button title="Salvar endereço" secondary disabled={saving} onPress={() => void save(false)} /></View>
         <View style={ui.grow}><Button title={status === 'conectado' || status === 'conectando' ? 'Reconectar' : 'Conectar'} icon={status === 'conectado' ? 'refresh' : 'wifi'} loading={saving} onPress={() => void save(true)} /></View>
       </View>
       <Button title="Desconectar" icon="wifiOff" secondary onPress={disconnect} />
